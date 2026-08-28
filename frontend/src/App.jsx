@@ -9,6 +9,9 @@ import Students from "./pages/Students";
 import Attendance from "./pages/Attendance";
 import Grades from "./pages/Grades";
 import Events from "./pages/Events";
+import Fees from "./pages/Fees";
+import Expenses from "./pages/Expenses";
+import Teachers from "./pages/Teachers";
 
 function Shell() {
   const { user } = useAuth();
@@ -23,6 +26,16 @@ function Shell() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin Exclusive: Teachers Node */}
+        <Route
+          path="/teachers"
+          element={
+            <ProtectedRoute roles={["admin"]}>
+              <Teachers />
             </ProtectedRoute>
           }
         />
@@ -50,6 +63,26 @@ function Shell() {
           element={
             <ProtectedRoute>
               <Grades />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin & Parent Accessible: Fees Ledgers */}
+        <Route
+          path="/fees"
+          element={
+            <ProtectedRoute roles={["admin", "parent"]}>
+              <Fees />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin Exclusive: Institutional Expenditures */}
+        <Route
+          path="/expenses"
+          element={
+            <ProtectedRoute roles={["admin"]}>
+              <Expenses />
             </ProtectedRoute>
           }
         />
