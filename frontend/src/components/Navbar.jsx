@@ -49,11 +49,10 @@ export default function Navbar() {
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Top Section: Brand & Navigation */}
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8 overflow-y-auto no-scrollbar max-h-[calc(100vh-140px)]">
         
         {/* Brand Header */}
-        <div className="flex items-center justify-between px-2">
-          {/* 1. FIXED: Removed overflow-hidden here so graduation icon remains visible on close */}
+        <div className="flex items-center justify-between px-2 shrink-0">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-600 shadow-md shadow-indigo-500/10">
               <svg className="h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -66,7 +65,6 @@ export default function Navbar() {
             </span>
           </div>
 
-          {/* 2. FIXED: Refactored responsive classes to ensure button stays completely hidden when sidebar closes */}
           <button 
             onClick={() => setIsPinned(!isPinned)}
             className={`h-6 w-6 items-center justify-center rounded-md border border-slate-700 !bg-slate-800/50 !text-slate-400 hover:!text-white hover:border-slate-500 transition-all 
@@ -90,6 +88,16 @@ export default function Navbar() {
             </svg>
             <span className={`whitespace-nowrap transition-opacity duration-200 ${isOpen ? "opacity-100" : "opacity-0 w-0 hidden"}`}>Dashboard</span>
           </Link>
+
+          {/* Admin Exclusive: Teachers Roster */}
+          {user.role === "admin" && (
+            <Link to="/teachers" className={linkClasses("/teachers")}>
+              <svg className="h-5 w-5 shrink-0 transition-transform group-hover/item:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              <span className={`whitespace-nowrap transition-opacity duration-200 ${isOpen ? "opacity-100" : "opacity-0 w-0 hidden"}`}>Teachers</span>
+            </Link>
+          )}
 
           {/* Admin & Teacher Restricted Sub-Links */}
           {(user.role === "admin" || user.role === "teacher") && (
@@ -127,6 +135,26 @@ export default function Navbar() {
             </Link>
           )}
 
+          {/* Admin & Parent Restricted Route: Fees Management */}
+          {(user.role === "admin" || user.role === "parent") && (
+            <Link to="/fees" className={linkClasses("/fees")}>
+              <svg className="h-5 w-5 shrink-0 transition-transform group-hover/item:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span className={`whitespace-nowrap transition-opacity duration-200 ${isOpen ? "opacity-100" : "opacity-0 w-0 hidden"}`}>Fees</span>
+            </Link>
+          )}
+
+          {/* Admin Exclusive Route: Institutional Expenses */}
+          {user.role === "admin" && (
+            <Link to="/expenses" className={linkClasses("/expenses")}>
+              <svg className="h-5 w-5 shrink-0 transition-transform group-hover/item:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className={`whitespace-nowrap transition-opacity duration-200 ${isOpen ? "opacity-100" : "opacity-0 w-0 hidden"}`}>Expenses</span>
+            </Link>
+          )}
+
           {/* Events Link */}
           <Link to="/events" className={linkClasses("/events")}>
             <svg className="h-5 w-5 shrink-0 transition-transform group-hover/item:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -138,7 +166,7 @@ export default function Navbar() {
       </div>
 
       {/* Bottom Section: User Profile & Logout Action */}
-      <div className="flex flex-col gap-4 border-t border-slate-800/80 pt-4">
+      <div className="flex flex-col gap-4 border-t border-slate-800/80 pt-4 shrink-0">
         
         {/* Profile Card Fragment */}
         <div className="flex items-center gap-3 px-1">
