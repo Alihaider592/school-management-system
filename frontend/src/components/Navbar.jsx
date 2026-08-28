@@ -53,7 +53,6 @@ export default function Navbar() {
         
         {/* Brand Header */}
         <div className="flex items-center justify-between px-2">
-          {/* 1. FIXED: Removed overflow-hidden here so graduation icon remains visible on close */}
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-600 shadow-md shadow-indigo-500/10">
               <svg className="h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -66,7 +65,6 @@ export default function Navbar() {
             </span>
           </div>
 
-          {/* 2. FIXED: Refactored responsive classes to ensure button stays completely hidden when sidebar closes */}
           <button 
             onClick={() => setIsPinned(!isPinned)}
             className={`h-6 w-6 items-center justify-center rounded-md border border-slate-700 !bg-slate-800/50 !text-slate-400 hover:!text-white hover:border-slate-500 transition-all 
@@ -90,6 +88,16 @@ export default function Navbar() {
             </svg>
             <span className={`whitespace-nowrap transition-opacity duration-200 ${isOpen ? "opacity-100" : "opacity-0 w-0 hidden"}`}>Dashboard</span>
           </Link>
+
+          {/* Admin Exclusive: Teachers Roster */}
+          {user.role === "admin" && (
+            <Link to="/teachers" className={linkClasses("/teachers")}>
+              <svg className="h-5 w-5 shrink-0 transition-transform group-hover/item:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              <span className={`whitespace-nowrap transition-opacity duration-200 ${isOpen ? "opacity-100" : "opacity-0 w-0 hidden"}`}>Teachers</span>
+            </Link>
+          )}
 
           {/* Admin & Teacher Restricted Sub-Links */}
           {(user.role === "admin" || user.role === "teacher") && (
