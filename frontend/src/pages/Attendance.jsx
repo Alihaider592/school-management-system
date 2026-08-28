@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 
-// Pass isOpen from your main layout layer to synchronize layout shifts
 export default function Attendance({ isOpen }) {
   const { user } = useAuth();
   const [className, setClassName] = useState(user?.assignedClasses?.[0] || "");
@@ -12,15 +11,50 @@ export default function Attendance({ isOpen }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
+  // Effect 1: Pull students roster when class target changes
   useEffect(() => {
     if (!className) return;
     setLoading(true);
+    setStudents([]);
+    setStatusMap({});
+    
     api
       .get("/students", { params: { class: className } })
-      .then((res) => setStudents(res.data.students || res.data))
+      .then((res) => {
+        const studentData = res.data.students || res.data;
+        setStudents(studentData);
+      })
       .catch(() => setMessage("Could not load students for this class."))
       .finally(() => setLoading(false));
   }, [className]);
+
+  // Effect 2: Pull existing logs when the date or class selections update
+  useEffect(() => {
+    if (!className || !date || students.length === 0) return;
+
+    api
+      .get("/attendance", { params: { class: className, date } })
+      .then((res) => {
+        const existingRecords = res.data.attendance || res.data;
+        if (existingRecords && existingRecords.length > 0) {
+          const map = {};
+          existingRecords.forEach((record) => {
+            // Adjust depending on if your API populates student as an object or raw ID string
+            const sId = record.student?._id || record.student;
+            if (sId) map[sId] = record.status;
+          });
+          setStatusMap(map);
+          setMessage(`Loaded existing data registry logs for ${date}.`);
+        } else {
+          setStatusMap({});
+          setMessage(`No existing logs found for ${date}. Ready for fresh input.`);
+        }
+      })
+      .catch(() => {
+        // If endpoint isn't fully set up yet, fallback silently to empty states
+        setStatusMap({});
+      });
+  }, [date, className, students]);
 
   function setStatus(studentId, status) {
     setStatusMap((prev) => ({ ...prev, [studentId]: status }));
@@ -39,18 +73,21 @@ export default function Attendance({ isOpen }) {
           api.post("/attendance", { student: studentId, date, status })
         )
       );
-      setMessage(`Saved attendance for ${entries.length} student(s).`);
+      setMessage(`Saved attendance logs for ${entries.length} student(s).`);
     } catch (err) {
       setMessage(err.response?.data?.message || "Could not save attendance.");
     }
   }
+
+  const presentCount = Object.values(statusMap).filter((s) => s === "present").length;
+  const absentCount = Object.values(statusMap).filter((s) => s === "absent").length;
+  const lateCount = Object.values(statusMap).filter((s) => s === "late").length;
 
   return (
     <div className={`min-h-screen bg-slate-950 text-slate-100 transition-all duration-300 ease-in-out ${
       isOpen ? "pl-64" : "pl-0 md:pl-16"
     }`}>
       
-      {/* Dynamic inline styles for premium stagger animations */}
       <style>{`
         @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(12px); }
@@ -64,7 +101,6 @@ export default function Attendance({ isOpen }) {
 
       <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-8">
         
-        {/* Header Section */}
         <header className="space-y-2 border-b border-slate-800/60 pb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in-up" style={{ animationDelay: "0ms" }}>
           <div>
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
@@ -81,7 +117,6 @@ export default function Attendance({ isOpen }) {
           </button>
         </header>
 
-        {/* Dynamic Context Parameters Bar */}
         <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 shadow-xl backdrop-blur-sm grid grid-cols-1 sm:grid-cols-2 gap-6 relative overflow-hidden group hover:border-slate-700/60 transition-all duration-300 animate-fade-in-up" style={{ animationDelay: "100ms" }}>
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -108,7 +143,6 @@ export default function Attendance({ isOpen }) {
           </div>
         </div>
 
-        {/* Feedback Alert Matrix */}
         {message && (
           <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl text-indigo-400 text-sm flex items-center justify-between animate-fade-in-up" style={{ animationDelay: "150ms" }}>
             <span>{message}</span>
@@ -116,7 +150,27 @@ export default function Attendance({ isOpen }) {
           </div>
         )}
 
-        {/* Data Load Interface Handler */}
+        {!loading && students.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 animate-fade-in-up" style={{ animationDelay: "180ms" }}>
+            <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 backdrop-blur-sm">
+              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Total Class Strength</span>
+              <div className="text-xl font-bold text-white mt-0.5">{students.length} Students</div>
+            </div>
+            <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 backdrop-blur-sm">
+              <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">Present Summary</span>
+              <div className="text-xl font-bold text-emerald-400 mt-0.5">{presentCount} <span className="text-xs text-slate-500 font-normal">/ {students.length}</span></div>
+            </div>
+            <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 backdrop-blur-sm">
+              <span className="text-[10px] text-rose-400 font-semibold uppercase tracking-wider">Absent Summary</span>
+              <div className="text-xl font-bold text-rose-400 mt-0.5">{absentCount} <span className="text-xs text-slate-500 font-normal">/ {students.length}</span></div>
+            </div>
+            <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 backdrop-blur-sm">
+              <span className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">Late Summary</span>
+              <div className="text-xl font-bold text-amber-400 mt-0.5">{lateCount} <span className="text-xs text-slate-500 font-normal">unexcused</span></div>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="py-20 flex justify-center items-center text-slate-500 gap-2 animate-fade-in-up" style={{ animationDelay: "200ms" }}>
             <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
@@ -147,7 +201,6 @@ export default function Attendance({ isOpen }) {
                       </td>
                       <td className="p-4 font-mono text-xs text-slate-400">{s.rollNumber}</td>
                       
-                      {/* State Option Selector Group */}
                       {["present", "absent", "late"].map((opt) => {
                         const isChecked = statusMap[s._id] === opt;
                         const dynamicRadioColor = 
