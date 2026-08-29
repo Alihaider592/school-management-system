@@ -15,7 +15,7 @@ export default function StudentAdmissionForm({ onSubmitSuccess }) {
     nationality: "Pakistani",
     studentPhoto: null,
 
-    // NEW: Student Portal Authentication (For login & automated dispatch email)
+    // Student Portal Authentication
     studentEmail: "",
     username: "",
     password: "",
@@ -34,6 +34,14 @@ export default function StudentAdmissionForm({ onSubmitSuccess }) {
     previousSchool: "",
     admissionDate: new Date().toISOString().split("T")[0],
     residentialAddress: "",
+
+    // NEW: Fee & Financial Details
+    admissionFee: "",
+    monthlyTuitionFee: "",
+    securityDeposit: "",
+    feeDiscountPercent: "0",
+    paymentStatus: "Pending",
+    paymentMethod: "Bank Transfer",
   });
 
   // Automatically generates a basic username from the full name for convenience
@@ -44,7 +52,7 @@ export default function StudentAdmissionForm({ onSubmitSuccess }) {
     setFormData((prev) => ({ 
       ...prev, 
       fullName: nameVal,
-      username: prev.username ? prev.username : cleanUsername // Autofills if empty
+      username: prev.username ? prev.username : cleanUsername 
     }));
   };
 
@@ -138,9 +146,9 @@ export default function StudentAdmissionForm({ onSubmitSuccess }) {
           </div>
         </div>
 
-        {/* NEW SECTION 2: PORTAL ACCESS & LOGIN CREDENTIALS SETUP */}
+        {/* SECTION 2: PORTAL ACCESS & LOGIN CREDENTIALS SETUP */}
         <div className="border-t border-slate-800/60 pt-6">
-          <h3 className="text-sm font-bold tracking-wider text-emerald-400 uppercase mb-4">2. Portal Access Credentials (Automated Email Setup)</h3>
+          <h3 className="text-sm font-bold tracking-wider text-emerald-400 uppercase mb-4">2. Portal Access Credentials</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1.5">Student Email Address *</label>
@@ -154,10 +162,10 @@ export default function StudentAdmissionForm({ onSubmitSuccess }) {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5-flex flex justify-between items-center mb-1.5">
-                <span className="text-xs font-bold text-slate-300">Portal Password *</span>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="text-xs font-bold text-slate-300">Portal Password *</label>
                 <button type="button" onClick={generateTempPassword} className="text-[10px] font-bold text-emerald-400 hover:underline">Generate Secure</button>
-              </label>
+              </div>
               <input required type="text" name="password" value={formData.password} onChange={handleChange} className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 text-sm rounded-xl p-2.5 text-white outline-none transition-colors" placeholder="Enter or generate password" />
             </div>
           </div>
@@ -218,6 +226,51 @@ export default function StudentAdmissionForm({ onSubmitSuccess }) {
           <div className="mt-4">
             <label className="block text-xs font-bold text-slate-300 mb-1.5">Current Residential Address *</label>
             <textarea required rows="2" name="residentialAddress" value={formData.residentialAddress} onChange={handleChange} className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 text-sm rounded-xl p-2.5 text-white outline-none transition-colors resize-none" placeholder="Complete physical address..." />
+          </div>
+        </div>
+
+        {/* NEW SECTION 5: FEE & FINANCIAL STRUCTURE */}
+        <div className="border-t border-slate-800/60 pt-6">
+          <h3 className="text-sm font-bold tracking-wider text-amber-400 uppercase mb-4">5. Fee & Financial Details</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1.5">Admission Fee (PKR) *</label>
+              <input required type="number" name="admissionFee" value={formData.admissionFee} onChange={handleChange} className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-sm rounded-xl p-2.5 text-white outline-none transition-colors" placeholder="15000" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1.5">Monthly Tuition Fee (PKR) *</label>
+              <input required type="number" name="monthlyTuitionFee" value={formData.monthlyTuitionFee} onChange={handleChange} className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-sm rounded-xl p-2.5 text-white outline-none transition-colors" placeholder="8000" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1.5">Security Deposit (Refundable)</label>
+              <input type="number" name="securityDeposit" value={formData.securityDeposit} onChange={handleChange} className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-sm rounded-xl p-2.5 text-white outline-none transition-colors" placeholder="5000" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1.5">Fee Discount / Scholarship (%)</label>
+              <input type="number" min="0" max="100" name="feeDiscountPercent" value={formData.feeDiscountPercent} onChange={handleChange} className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-sm rounded-xl p-2.5 text-white outline-none transition-colors" placeholder="0" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1.5">Initial Payment Status *</label>
+              <select required name="paymentStatus" value={formData.paymentStatus} onChange={handleChange} className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-sm rounded-xl p-2.5 text-white outline-none transition-colors">
+                <option value="Pending">Pending</option>
+                <option value="Paid">Paid</option>
+                <option value="Partially Paid">Partially Paid</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1.5">Payment Method</label>
+              <select name="paymentMethod" value={formData.paymentMethod} onChange={handleChange} className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-sm rounded-xl p-2.5 text-white outline-none transition-colors">
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Cash">Cash</option>
+                <option value="Cheque">Cheque</option>
+                <option value="Online Payment">Online Payment</option>
+              </select>
+            </div>
           </div>
         </div>
 
