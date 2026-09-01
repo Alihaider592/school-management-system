@@ -1,11 +1,12 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
-export default function StudentAdmissionForm({ onSubmitSuccess }) {
+export default function StudentAdmissionForm({ onSubmit, onCancel, initialData }) {
   const fileInputRef = useRef(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [activeTab, setActiveTab] = useState("personal");
+  const [submitting, setSubmitting] = useState(false);
 
-  const [formData, setFormData] = useState({
+  const emptyForm = {
     fullName: "",
     dateOfBirth: "",
     gender: "",
@@ -20,9 +21,9 @@ export default function StudentAdmissionForm({ onSubmitSuccess }) {
     password: "",
 
     fatherName: "",
-    fatherCnic: "",    
+    fatherCnic: "",
     fatherPosition: "",
-    fatherDepartment: "", 
+    fatherDepartment: "",
     fatherPhone: "",
     fatherEmail: "",
     emergencyContact: "",
@@ -38,16 +39,73 @@ export default function StudentAdmissionForm({ onSubmitSuccess }) {
     feeDiscountPercent: "0",
     paymentStatus: "Pending",
     paymentMethod: "Bank Transfer",
-  });
+  };
+
+  const [formData, setFormData] = useState(emptyForm);
+
+  // Pre-fill the form when editing an existing student.
+  // Maps backend field names (schema) -> this form's field names.
+  useEffect(() => {
+    if (!initialData) {
+      setFormData(emptyForm);
+      setPhotoPreview(null);
+      return;
+    }
+
+    setFormData({
+      fullName: initialData.name || "",
+      dateOfBirth: initialData.dob ? initialData.dob.split("T")[0] : "",
+      gender: initialData.gender
+        ? initialData.gender.charAt(0).toUpperCase() + initialData.gender.slice(1)
+        : "",
+      bFormNumber: initialData.bFormNumber || "",
+      bloodGroup: initialData.bloodGroup || "",
+      religion: initialData.religion || "",
+      nationality: initialData.nationality || "Pakistani",
+      studentPhoto: null, // never pre-fill a File object; existing photo shown via preview only
+
+      studentEmail: initialData.email || "",
+      username: initialData.username || "",
+      password: "", // never pre-fill password; leave blank = keep existing on update
+
+      fatherName: initialData.fatherName || "",
+      fatherCnic: initialData.fatherCnic || "",
+      fatherPosition: initialData.fatherPosition || "",
+      fatherDepartment: initialData.fatherDepartment || "",
+      fatherPhone: initialData.fatherPhone || "",
+      fatherEmail: initialData.fatherEmail || "",
+      emergencyContact: initialData.emergencyContact || "",
+
+      admissionClass: initialData.class || "",
+      previousSchool: initialData.previousSchool || "",
+      admissionDate: initialData.enrollmentDate
+        ? initialData.enrollmentDate.split("T")[0]
+        : new Date().toISOString().split("T")[0],
+      residentialAddress: initialData.address || "",
+
+      admissionFee: initialData.admissionFee ?? "",
+      monthlyTuitionFee: initialData.monthlyTuitionFee ?? "",
+      securityDeposit: initialData.securityDeposit ?? "",
+      feeDiscountPercent: initialData.feeDiscountPercent ?? "0",
+      paymentStatus: initialData.paymentStatus || "Pending",
+      paymentMethod: initialData.paymentMethod || "Bank Transfer",
+    });
+
+    setPhotoPreview(initialData.photoUrl || null);
+    setActiveTab("personal");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData]);
 
   const handleNameChange = (e) => {
     const nameVal = e.target.value;
-    const cleanUsername = nameVal.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10) + Math.floor(100 + Math.random() * 900);
-    
-    setFormData((prev) => ({ 
-      ...prev, 
+    const cleanUsername =
+      nameVal.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10) +
+      Math.floor(100 + Math.random() * 900);
+
+    setFormData((prev) => ({
+      ...prev,
       fullName: nameVal,
-      username: prev.username ? prev.username : cleanUsername 
+      username: prev.username ? prev.username : cleanUsername,
     }));
   };
 
@@ -57,7 +115,7 @@ export default function StudentAdmissionForm({ onSubmitSuccess }) {
     for (let i = 0; i < 10; i++) {
       generatedPass += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    setFormData(prev => ({ ...prev, password: generatedPass }));
+    setFormData((prev) => ({ ...prev, password: generatedPass }));
   };
 
   const handleChange = (e) => {
@@ -75,54 +133,95 @@ export default function StudentAdmissionForm({ onSubmitSuccess }) {
 
   const triggerFileSelect = () => fileInputRef.current.click();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Admission Data Packet for DB & Email Dispatch:", formData);
-    if (onSubmitSuccess) onSubmitSuccess(formData);
+    setSubmitting(true);
+
+    const payload = new FormData();
+    payload.append("name", formData.fullName);
+    payload.append("dob", formData.dateOfBirth);
+    payload.append("gender", formData.gender.toLowerCase());
+    payload.append("bFormNumber", formData.bFormNumber);
+    payload.append("bloodGroup", formData.bloodGroup);
+    payload.append("religion", formData.religion);
+    payload.append("nationality", formData.nationality);
+    payload.append("email", formData.studentEmail);
+    payload.append("username", formData.username);
+    // Only send password if the user actually typed/generated one.
+    // Prevents wiping an existing password with an empty string on edit.
+    if (formData.password) {
+      payload.append("password", formData.password);
+    }
+    payload.append("fatherName", formData.fatherName);
+    payload.append("fatherCnic", formData.fatherCnic);
+    payload.append("fatherPosition", formData.fatherPosition);
+    payload.append("fatherDepartment", formData.fatherDepartment);
+    payload.append("fatherPhone", formData.fatherPhone);
+    payload.append("fatherEmail", formData.fatherEmail);
+    payload.append("emergencyContact", formData.emergencyContact);
+    payload.append("class", formData.admissionClass);
+    payload.append("previousSchool", formData.previousSchool);
+    payload.append("enrollmentDate", formData.admissionDate);
+    payload.append("address", formData.residentialAddress);
+    payload.append("admissionFee", formData.admissionFee);
+    payload.append("monthlyTuitionFee", formData.monthlyTuitionFee);
+    payload.append("securityDeposit", formData.securityDeposit);
+    payload.append("feeDiscountPercent", formData.feeDiscountPercent);
+    payload.append("paymentStatus", formData.paymentStatus);
+    payload.append("paymentMethod", formData.paymentMethod);
+    if (formData.studentPhoto) {
+      payload.append("studentPhoto", formData.studentPhoto);
+    }
+
+    try {
+      await onSubmit(payload);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Enhanced Tab Metadata with Icons & Colors
   const tabs = [
-    { 
-      id: "personal", 
-      step: "01", 
-      label: "Personal", 
+    {
+      id: "personal",
+      step: "01",
+      label: "Personal",
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
         </svg>
       ),
       activeColor: "bg-cyan-500 text-slate-950 shadow-cyan-500/25",
-      textColor: "text-cyan-400"
+      textColor: "text-cyan-400",
     },
-    { 
-      id: "credentials", 
-      step: "02", 
-      label: "Portal Access", 
+    {
+      id: "credentials",
+      step: "02",
+      label: "Portal Access",
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
         </svg>
       ),
       activeColor: "bg-emerald-500 text-slate-950 shadow-emerald-500/25",
-      textColor: "text-emerald-400"
+      textColor: "text-emerald-400",
     },
-    { 
-      id: "parent", 
-      step: "03", 
-      label: "Parent Info", 
+    {
+      id: "parent",
+      step: "03",
+      label: "Parent Info",
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5 5 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
       ),
       activeColor: "bg-purple-500 text-slate-950 shadow-purple-500/25",
-      textColor: "text-purple-400"
+      textColor: "text-purple-400",
     },
-    { 
-      id: "academic", 
-      step: "04", 
-      label: "Academic", 
+    {
+      id: "academic",
+      step: "04",
+      label: "Academic",
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5z" />
@@ -130,29 +229,35 @@ export default function StudentAdmissionForm({ onSubmitSuccess }) {
         </svg>
       ),
       activeColor: "bg-indigo-500 text-slate-950 shadow-indigo-500/25",
-      textColor: "text-indigo-400"
+      textColor: "text-indigo-400",
     },
-    { 
-      id: "fees", 
-      step: "05", 
-      label: "Fee Structure", 
+    {
+      id: "fees",
+      step: "05",
+      label: "Fee Structure",
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
       activeColor: "bg-amber-500 text-slate-950 shadow-amber-500/25",
-      textColor: "text-amber-400"
+      textColor: "text-amber-400",
     },
   ];
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-5xl mx-auto bg-slate-900 border border-slate-800/80 rounded-2xl text-slate-100 shadow-2xl overflow-hidden">
-      
+
       {/* Header Matrix */}
       <div className="p-6 sm:p-8 border-b border-slate-800/80 bg-slate-900/50">
-        <h2 className="text-xl font-bold tracking-tight text-white sm:text-2xl">New Student Admission Form</h2>
-        <p className="mt-1 text-xs text-slate-400">Complete the step-by-step registration wizard below.</p>
+        <h2 className="text-xl font-bold tracking-tight text-white sm:text-2xl">
+          {initialData ? "Edit Student Profile" : "New Student Admission Form"}
+        </h2>
+        <p className="mt-1 text-xs text-slate-400">
+          {initialData
+            ? "Update the pupil's information below."
+            : "Complete the step-by-step registration wizard below."}
+        </p>
       </div>
 
       {/* Modern Floating Segmented Navigation Bar */}
@@ -183,7 +288,7 @@ export default function StudentAdmissionForm({ onSubmitSuccess }) {
 
       {/* Tab Content Container */}
       <div className="p-6 sm:p-8 min-h-[380px]">
-        
+
         {/* TAB 1: PERSONAL INFORMATION */}
         {activeTab === "personal" && (
           <div>
@@ -197,7 +302,7 @@ export default function StudentAdmissionForm({ onSubmitSuccess }) {
                 {photoPreview ? (
                   <div className="relative h-32 w-32 rounded-lg overflow-hidden border border-slate-700">
                     <img src={photoPreview} alt="Preview" className="h-full w-full object-cover" />
-                    <button type="button" onClick={() => { setPhotoPreview(null); setFormData(p => ({...p, studentPhoto: null})) }} className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity text-xs font-bold text-red-400">Remove</button>
+                    <button type="button" onClick={() => { setPhotoPreview(null); setFormData(p => ({ ...p, studentPhoto: null })) }} className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity text-xs font-bold text-red-400">Remove</button>
                   </div>
                 ) : (
                   <button type="button" onClick={triggerFileSelect} className="flex flex-col items-center justify-center h-32 w-32 rounded-lg bg-slate-800/40 hover:bg-slate-800 transition-all border border-slate-700 text-slate-400 hover:text-slate-200">
@@ -258,10 +363,20 @@ export default function StudentAdmissionForm({ onSubmitSuccess }) {
 
               <div>
                 <div className="flex justify-between items-center mb-1.5">
-                  <label className="text-xs font-bold text-slate-300">Portal Password *</label>
+                  <label className="text-xs font-bold text-slate-300">
+                    Portal Password {initialData ? "" : "*"}
+                  </label>
                   <button type="button" onClick={generateTempPassword} className="text-[10px] font-bold text-emerald-400 hover:underline">Generate Secure</button>
                 </div>
-                <input required type="text" name="password" value={formData.password} onChange={handleChange} className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 text-sm rounded-xl p-2.5 text-white outline-none transition-colors" placeholder="Enter or generate password" />
+                <input
+                  required={!initialData}
+                  type="text"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 text-sm rounded-xl p-2.5 text-white outline-none transition-colors"
+                  placeholder={initialData ? "Leave blank to keep current password" : "Enter or generate password"}
+                />
               </div>
             </div>
           </div>
@@ -417,9 +532,29 @@ export default function StudentAdmissionForm({ onSubmitSuccess }) {
           )}
         </div>
 
-        <button type="submit" className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-xs font-black tracking-wide text-white shadow-lg shadow-emerald-950/40 transition-all active:scale-[0.98]">
-          Process Admission & Send Email
-        </button>
+        <div className="flex items-center gap-2">
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={submitting}
+              className="px-4 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-xs font-medium text-slate-300 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={submitting}
+            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-xs font-black tracking-wide text-white shadow-lg shadow-emerald-950/40 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {submitting
+              ? "Saving..."
+              : initialData
+              ? "Update Student Record"
+              : "Process Admission & Send Email"}
+          </button>
+        </div>
       </div>
     </form>
   );

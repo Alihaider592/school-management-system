@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 const connectDB = require("./config/db");
 const errorHandler = require("./middleware/errorHandler");
 
@@ -17,6 +18,11 @@ const app = express();
 const allowedOrigins = (process.env.CLIENT_ORIGIN || "http://localhost:5173").split(",");
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
+
+// --- Static file serving (uploaded student photos, etc.) ---
+// Files saved by middleware/upload.js under backend/uploads/... become
+// reachable at http://localhost:5000/uploads/...
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // --- Health check ---
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
