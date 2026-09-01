@@ -9,7 +9,9 @@ export default function Attendance({ isOpen }) {
   const [students, setStudents] = useState([]);
   const [statusMap, setStatusMap] = useState({});
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [hasExistingLogs, setHasExistingLogs] = useState(false);
 
   // Effect 1: Pull students roster when class target changes
   useEffect(() => {
@@ -17,7 +19,7 @@ export default function Attendance({ isOpen }) {
     setLoading(true);
     setStudents([]);
     setStatusMap({});
-    
+
     api
       .get("/students", { params: { class: className } })
       .then((res) => {
@@ -28,14 +30,16 @@ export default function Attendance({ isOpen }) {
       .finally(() => setLoading(false));
   }, [className]);
 
-  // Effect 2: Pull existing logs when the date or class selections update
+  // Effect 2: Pull existing logs when the date or class selections update.
+  // If no logs exist yet for this date, default everyone to "present" —
+  // the common case — so the admin/teacher only has to touch the exceptions.
   useEffect(() => {
     if (!className || !date || students.length === 0) return;
 
     api
-      .get("/attendance", { params: { class: className, date } })
+      .get(`/attendance/class/${encodeURIComponent(className)}`, { params: { date } })
       .then((res) => {
-        const existingRecords = res.data.attendance || res.data;
+        const existingRecords = res.data.records || res.data.attendance || res.data;
         if (existingRecords && existingRecords.length > 0) {
           const map = {};
           existingRecords.forEach((record) => {
@@ -43,39 +47,69 @@ export default function Attendance({ isOpen }) {
             const sId = record.student?._id || record.student;
             if (sId) map[sId] = record.status;
           });
+          // Any student in the roster not covered by a saved record
+          // (e.g. newly enrolled) still defaults to present.
+          students.forEach((s) => {
+            if (!map[s._id]) map[s._id] = "present";
+          });
           setStatusMap(map);
-          setMessage(`Loaded existing data registry logs for ${date}.`);
+          setHasExistingLogs(true);
+          setMessage(`Loaded existing attendance for ${date}.`);
         } else {
-          setStatusMap({});
-          setMessage(`No existing logs found for ${date}. Ready for fresh input.`);
+          const defaultMap = {};
+          students.forEach((s) => {
+            defaultMap[s._id] = "present";
+          });
+          setStatusMap(defaultMap);
+          setHasExistingLogs(false);
+          setMessage(`No existing logs for ${date} — everyone marked present by default. Adjust as needed.`);
         }
       })
       .catch(() => {
-        // If endpoint isn't fully set up yet, fallback silently to empty states
-        setStatusMap({});
+        // If endpoint isn't fully set up yet, fall back to default-present
+        // rather than leaving the whole roster blank.
+        const defaultMap = {};
+        students.forEach((s) => {
+          defaultMap[s._id] = "present";
+        });
+        setStatusMap(defaultMap);
+        setHasExistingLogs(false);
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, className, students]);
 
   function setStatus(studentId, status) {
     setStatusMap((prev) => ({ ...prev, [studentId]: status }));
   }
 
+  function markAll(status) {
+    const map = {};
+    students.forEach((s) => {
+      map[s._id] = status;
+    });
+    setStatusMap(map);
+  }
+
   async function handleSaveAll() {
     setMessage("");
+    const entries = Object.entries(statusMap);
+    if (entries.length === 0) {
+      setMessage("Mark at least one student before saving.");
+      return;
+    }
+    setSaving(true);
     try {
-      const entries = Object.entries(statusMap);
-      if (entries.length === 0) {
-        setMessage("Mark at least one student before saving.");
-        return;
-      }
       await Promise.all(
         entries.map(([studentId, status]) =>
           api.post("/attendance", { student: studentId, date, status })
         )
       );
-      setMessage(`Saved attendance logs for ${entries.length} student(s).`);
+      setHasExistingLogs(true);
+      setMessage(`Saved attendance for ${entries.length} student(s) on ${date}.`);
     } catch (err) {
       setMessage(err.response?.data?.message || "Could not save attendance.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -87,7 +121,7 @@ export default function Attendance({ isOpen }) {
     <div className={`min-h-screen bg-slate-950 text-slate-100 transition-all duration-300 ease-in-out ${
       isOpen ? "pl-64" : "pl-0 md:pl-16"
     }`}>
-      
+
       <style>{`
         @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(12px); }
@@ -100,7 +134,7 @@ export default function Attendance({ isOpen }) {
       `}</style>
 
       <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-8">
-        
+
         <header className="space-y-2 border-b border-slate-800/60 pb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in-up" style={{ animationDelay: "0ms" }}>
           <div>
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
@@ -109,11 +143,12 @@ export default function Attendance({ isOpen }) {
             <p className="text-sm text-slate-400 mt-1">Take daily roll call records and log tracking states for assigned classes.</p>
           </div>
 
-          <button 
+          <button
             onClick={handleSaveAll}
-            className="px-5 py-2.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 border border-indigo-500 shadow-lg shadow-indigo-600/10 rounded-xl transition-all active:scale-95 shrink-0 self-end sm:self-auto"
+            disabled={saving || students.length === 0}
+            className="px-5 py-2.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 border border-indigo-500 shadow-lg shadow-indigo-600/10 rounded-xl transition-all active:scale-95 shrink-0 self-end sm:self-auto disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Save Attendance Session
+            {saving ? "Saving..." : hasExistingLogs ? "Update Attendance" : "Save Attendance Session"}
           </button>
         </header>
 
@@ -134,10 +169,10 @@ export default function Attendance({ isOpen }) {
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
               Registry Logging Date
             </label>
-            <input 
-              type="date" 
-              value={date} 
-              onChange={(e) => setDate(e.target.value)} 
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
               className="w-full max-w-sm bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all [color-scheme:dark]"
             />
           </div>
@@ -151,24 +186,43 @@ export default function Attendance({ isOpen }) {
         )}
 
         {!loading && students.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 animate-fade-in-up" style={{ animationDelay: "180ms" }}>
-            <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 backdrop-blur-sm">
-              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Total Class Strength</span>
-              <div className="text-xl font-bold text-white mt-0.5">{students.length} Students</div>
+          <>
+            {/* Bulk mark-all shortcuts */}
+            <div className="flex flex-wrap items-center gap-2 animate-fade-in-up" style={{ animationDelay: "170ms" }}>
+              <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider mr-1">Quick Mark:</span>
+              <button
+                onClick={() => markAll("present")}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all active:scale-95"
+              >
+                Mark All Present
+              </button>
+              <button
+                onClick={() => markAll("absent")}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-all active:scale-95"
+              >
+                Mark All Absent
+              </button>
             </div>
-            <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 backdrop-blur-sm">
-              <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">Present Summary</span>
-              <div className="text-xl font-bold text-emerald-400 mt-0.5">{presentCount} <span className="text-xs text-slate-500 font-normal">/ {students.length}</span></div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 animate-fade-in-up" style={{ animationDelay: "180ms" }}>
+              <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 backdrop-blur-sm">
+                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Total Class Strength</span>
+                <div className="text-xl font-bold text-white mt-0.5">{students.length} Students</div>
+              </div>
+              <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 backdrop-blur-sm">
+                <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">Present Summary</span>
+                <div className="text-xl font-bold text-emerald-400 mt-0.5">{presentCount} <span className="text-xs text-slate-500 font-normal">/ {students.length}</span></div>
+              </div>
+              <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 backdrop-blur-sm">
+                <span className="text-[10px] text-rose-400 font-semibold uppercase tracking-wider">Absent Summary</span>
+                <div className="text-xl font-bold text-rose-400 mt-0.5">{absentCount} <span className="text-xs text-slate-500 font-normal">/ {students.length}</span></div>
+              </div>
+              <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 backdrop-blur-sm">
+                <span className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">Late Summary</span>
+                <div className="text-xl font-bold text-amber-400 mt-0.5">{lateCount} <span className="text-xs text-slate-500 font-normal">unexcused</span></div>
+              </div>
             </div>
-            <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 backdrop-blur-sm">
-              <span className="text-[10px] text-rose-400 font-semibold uppercase tracking-wider">Absent Summary</span>
-              <div className="text-xl font-bold text-rose-400 mt-0.5">{absentCount} <span className="text-xs text-slate-500 font-normal">/ {students.length}</span></div>
-            </div>
-            <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 backdrop-blur-sm">
-              <span className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">Late Summary</span>
-              <div className="text-xl font-bold text-amber-400 mt-0.5">{lateCount} <span className="text-xs text-slate-500 font-normal">unexcused</span></div>
-            </div>
-          </div>
+          </>
         )}
 
         {loading ? (
@@ -200,10 +254,10 @@ export default function Attendance({ isOpen }) {
                         {s.name}
                       </td>
                       <td className="p-4 font-mono text-xs text-slate-400">{s.rollNumber}</td>
-                      
+
                       {["present", "absent", "late"].map((opt) => {
                         const isChecked = statusMap[s._id] === opt;
-                        const dynamicRadioColor = 
+                        const dynamicRadioColor =
                           opt === "present" ? "checked:bg-emerald-500 checked:border-emerald-400" :
                           opt === "absent" ? "checked:bg-rose-500 checked:border-rose-400" :
                           "checked:bg-amber-500 checked:border-amber-400";
