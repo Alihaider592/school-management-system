@@ -1,6 +1,19 @@
 const Attendance = require("../models/Attendance");
 const Student = require("../models/Student");
 
+// Normalizes any date input ("2026-08-31", a Date object, an ISO string with
+// a time component, etc.) down to midnight UTC. This matters because `date`
+// is stored as a real Date type — without normalizing, the same calendar
+// day could be saved with slightly different times on different requests,
+// which would break both the unique (student, date) index and the
+// findOneAndUpdate match below (silently creating duplicates instead of
+// updating the existing record).
+function startOfDayUTC(dateInput) {
+  const d = new Date(dateInput);
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+}
+
 // Ensures a teacher can only mark/view attendance for their own class,
 // and a parent can only view their own child's attendance.
 async function assertCanAccessStudent(user, studentId) {
@@ -27,17 +40,30 @@ async function assertCanAccessStudent(user, studentId) {
 async function markAttendance(req, res, next) {
   try {
     const { student, date, status, remarks } = req.body;
+
+    if (!student || !date || !status) {
+      const err = new Error("student, date, and status are all required.");
+      err.statusCode = 400;
+      throw err;
+    }
+
     await assertCanAccessStudent(req.user, student);
+
+    const normalizedDate = startOfDayUTC(date);
 
     // upsert: one record per student per day
     const record = await Attendance.findOneAndUpdate(
-      { student, date },
-      { student, date, status, remarks, markedBy: req.user._id },
-      { new: true, upsert: true, runValidators: true }
+      { student, date: normalizedDate },
+      { student, date: normalizedDate, status, remarks, markedBy: req.user._id },
+      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
     );
 
     res.status(201).json({ attendance: record });
   } catch (err) {
+    if (err.code === 11000) {
+      err.statusCode = 409;
+      err.message = "Attendance for this student on this date was already recorded.";
+    }
     next(err);
   }
 }
@@ -58,7 +84,7 @@ async function getAttendanceForStudent(req, res, next) {
   }
 }
 
-// GET /api/attendance/class/:className  (admin, teacher)
+// GET /api/attendance/class/:className?date=2026-08-31  (admin, teacher)
 async function getAttendanceForClass(req, res, next) {
   try {
     const { className } = req.params;
@@ -72,7 +98,12 @@ async function getAttendanceForClass(req, res, next) {
     const studentIds = students.map((s) => s._id);
 
     const filter = { student: { $in: studentIds } };
-    if (date) filter.date = new Date(date);
+    if (date) {
+      const dayStart = startOfDayUTC(date);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+      filter.date = { $gte: dayStart, $lt: dayEnd };
+    }
 
     const records = await Attendance.find(filter).populate("student", "name rollNumber");
     res.json({ count: records.length, records });
